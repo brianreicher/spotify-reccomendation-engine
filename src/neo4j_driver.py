@@ -2,11 +2,6 @@
 import neo4j
 from neo4j import GraphDatabase
 
-"""
-Neo4j Database Schema:
-
-(:Track {id: STRING, artist: STRING, album: STRING, name: STRING, popularity: INT, duration_ms: INT, explicit: BOOLEAN, danceability: FLOAT, energy: FLOAT, key: INT, loudness: FLOAT, mode: INT, speechiness: FLOAT, acousticness: FLOAT, instrumentalness: FLOAT, liveness: FLOAT, valence: FLOAT, tempo: FLOAT, time_signature: INT, genre: STRING})
-"""
 
 class Neo4jDriver():
     """
