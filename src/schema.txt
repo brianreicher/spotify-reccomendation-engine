@@ -4,12 +4,12 @@ CREATE INDEX ON :Album(name);
 CREATE INDEX ON :Genre(name);
 
 // Load artists and albums
-LOAD CSV WITH HEADERS FROM 'file:///spotify.csv' AS row
+LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
 MERGE (:Artist {name: row.artists})
 MERGE (:Album {name: row.album_name})
 
 // Load tracks
-LOAD CSV WITH HEADERS FROM 'file:///spotify.csv' AS row
+LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
 MATCH (artist:Artist {name: row.artists})
 MATCH (album:Album {name: row.album_name})
 MERGE (:Track {
