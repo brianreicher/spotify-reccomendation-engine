@@ -5,9 +5,7 @@ from neo4j import GraphDatabase
 """
 Neo4j Database Schema:
 
-(:Track {id: STRING, name: STRING, popularity: INT, duration_ms: INT, explicit: BOOLEAN, danceability: FLOAT, energy: FLOAT, key: INT, loudness: FLOAT, mode: INT, speechiness: FLOAT, acousticness: FLOAT, instrumentalness: FLOAT, liveness: FLOAT, valence: FLOAT, tempo: FLOAT, time_signature: INT, genre: STRING})
-(:Artist {name: STRING})
-(:Album {name: STRING})
+(:Track {id: STRING, artist: STRING, album: STRING, name: STRING, popularity: INT, duration_ms: INT, explicit: BOOLEAN, danceability: FLOAT, energy: FLOAT, key: INT, loudness: FLOAT, mode: INT, speechiness: FLOAT, acousticness: FLOAT, instrumentalness: FLOAT, liveness: FLOAT, valence: FLOAT, tempo: FLOAT, time_signature: INT, genre: STRING})
 """
 
 class Neo4jDriver():
@@ -56,19 +54,12 @@ class Neo4jDriver():
         try:
             with self.driver.session() as session:
                 session.run("CREATE INDEX ON :Track(id)")
-                session.run("CREATE INDEX ON :Artist(name)")
-                session.run("CREATE INDEX ON :Album(name)")
                 session.run("""
                     LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
-                    MERGE (:Artist {name: row.artists})
-                    MERGE (:Album {name: row.album_name})
-                """)
-                session.run("""
-                    LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
-                    MATCH (artist:Artist {name: row.artists})
-                    MATCH (album:Album {name: row.album_name})
                     MERGE (:Track {
                     id: row.track_id,
+                    artist: row.artists,
+                    album: row.album_name,
                     name: row.track_name,
                     popularity: toInteger(row.popularity),
                     duration_ms: toInteger(row.duration_ms),
