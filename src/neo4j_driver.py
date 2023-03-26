@@ -5,11 +5,9 @@ from neo4j import GraphDatabase
 """
 Neo4j Database Schema:
 
-(:Track {id: STRING, name: STRING, popularity: INT, duration_ms: INT, explicit: BOOLEAN, danceability: FLOAT, energy: FLOAT, key: INT, loudness: FLOAT, mode: INT, speechiness: FLOAT, acousticness: FLOAT, instrumentalness: FLOAT, liveness: FLOAT, valence: FLOAT, tempo: FLOAT, time_signature: INT})
+(:Track {id: STRING, name: STRING, popularity: INT, duration_ms: INT, explicit: BOOLEAN, danceability: FLOAT, energy: FLOAT, key: INT, loudness: FLOAT, mode: INT, speechiness: FLOAT, acousticness: FLOAT, instrumentalness: FLOAT, liveness: FLOAT, valence: FLOAT, tempo: FLOAT, time_signature: INT, genre: STRING})
 (:Artist {name: STRING})
 (:Album {name: STRING})
-(:Genre {name: STRING})
-
 """
 
 class Neo4jDriver():
@@ -60,7 +58,6 @@ class Neo4jDriver():
                 session.run("CREATE INDEX ON :Track(id)")
                 session.run("CREATE INDEX ON :Artist(name)")
                 session.run("CREATE INDEX ON :Album(name)")
-                session.run("CREATE INDEX ON :Genre(name)")
                 session.run("""
                     LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
                     MERGE (:Artist {name: row.artists})
@@ -151,7 +148,7 @@ class Neo4jDriver():
         """
         with self.driver.session() as session:
             tx = session.begin_transaction()
-            query = f"MATCH ()-[r]-() WHERE ID(r)={relationship_id} DELETE r"
+            query: str = f"MATCH ()-[r]-() WHERE ID(r)={relationship_id} DELETE r"
             tx.run(query)
             tx.commit()
 
@@ -161,9 +158,9 @@ class Neo4jDriver():
         """
         with self.driver.session() as session:
             tx = session.begin_transaction()
-            query = f"MATCH (n:{label}) WHERE n.{property_name}='{property_value}' RETURN n"
+            query: str = f"MATCH (n:{label}) WHERE n.{property_name}='{property_value}' RETURN n"
             result = tx.run(query)
-            records = [record["n"] for record in result]
+            records:list = [record["n"] for record in result]
             tx.commit()
             return records
 
@@ -173,7 +170,7 @@ class Neo4jDriver():
         """
         with self.driver.session() as session:
             tx = session.begin_transaction()
-            query = f"MATCH (n) WHERE ID(n)={node_id} RETURN n"
+            query: str = f"MATCH (n) WHERE ID(n)={node_id} RETURN n"
             result = tx.run(query)
             record = result.single()["n"]
             tx.commit()
