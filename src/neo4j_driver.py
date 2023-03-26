@@ -51,6 +51,51 @@ class Neo4jDriver():
         """
         self.driver.close()
 
+    def set_schema(self) -> bool:
+        """
+        Sets the session schema and drops the data in the database.
+        """
+        try:
+            with self.driver.session() as session:
+                session.run("CREATE INDEX ON :Track(id)")
+                session.run("CREATE INDEX ON :Artist(name)")
+                session.run("CREATE INDEX ON :Album(name)")
+                session.run("CREATE INDEX ON :Genre(name)")
+                session.run("""
+                    LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
+                    MERGE (:Artist {name: row.artists})
+                    MERGE (:Album {name: row.album_name})
+                """)
+                session.run("""
+                    LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
+                    MATCH (artist:Artist {name: row.artists})
+                    MATCH (album:Album {name: row.album_name})
+                    MERGE (:Track {
+                    id: row.track_id,
+                    name: row.track_name,
+                    popularity: toInteger(row.popularity),
+                    duration_ms: toInteger(row.duration_ms),
+                    explicit: toBoolean(row.explicit),
+                    danceability: toFloat(row.danceability),
+                    energy: toFloat(row.energy),
+                    key: toInteger(row.key),
+                    loudness: toFloat(row.loudness),
+                    mode: toInteger(row.mode),
+                    speechiness: toFloat(row.speechiness),
+                    acousticness: toFloat(row.acousticness),
+                    instrumentalness: toFloat(row.instrumentalness),
+                    liveness: toFloat(row.liveness),
+                    valence: toFloat(row.valence),
+                    tempo: toFloat(row.tempo),
+                    time_signature: toInteger(row.time_signature),
+                    genre: row.track_genre
+                    })-[:BY_ARTIST]->(artist)
+                    -[:ON_ALBUM]->(album)
+                """)
+            return True
+        except:
+            return False
+
     def flush_database(self) -> None:
         """
         Deletes all nodes and edges from the graph database.
