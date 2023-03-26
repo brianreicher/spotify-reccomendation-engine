@@ -29,6 +29,7 @@ MERGE (:Track {
   liveness: toFloat(row.liveness),
   valence: toFloat(row.valence),
   tempo: toFloat(row.tempo),
-  time_signature: toInteger(row.time_signature)
+  time_signature: toInteger(row.time_signature),
+  genre: row.track_genre
 })-[:BY_ARTIST]->(artist)
 -[:ON_ALBUM]->(album)
