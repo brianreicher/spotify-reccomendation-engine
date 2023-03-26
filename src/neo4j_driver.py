@@ -1,6 +1,8 @@
 
 import neo4j
 from neo4j import GraphDatabase
+import random
+import numpy as np
 
 
 class Neo4jDriver():
@@ -26,6 +28,10 @@ class Neo4jDriver():
         self.user: str = user
         self.password: str = password
         self.driver: GraphDatabase.driver = None
+
+        # storage of similarity scores
+        self.sim_scores: np.ndarray = np.empty((0,3))
+        self.sampled_pairs = None
 
     def connect(self) -> None:
         """
@@ -164,15 +170,34 @@ class Neo4jDriver():
             return record
 
     @staticmethod
-    def metric_threshold() -> float:
+    def cosine_similarity(node1, node2) -> float:
         """
-        Method for calculating a metric threshold between two nodes based off of Euclidean distance. 
-        Meant to check if a relationship should be created between two nodes
+        Method for calculating a metric threshold between two nodes based off of Cosine similarity. 
         """
         pass
 
-    def evaluate_metrics(self, nbatch_size=1000) -> None:
+    def evaluate_metrics(self, method=cosine_similarity()) -> bool:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
-        pass
+        if self.sampled_pairs is None:
+            self.sample_pairs()
+
+        try:
+            with self.driver.session() as session:
+                for pair in self.sampled_pairs:
+                    node1 = pair[0]
+                    node2 = pair[1]
+                    similarity_score: np.ndarray = method(node1, node2)
+                    self.sim_scores = np.vstack([self.sim_scores, similarity_score])
+            return True
+        except:
+            return False
+
+    def sample_pairs(self, batch_size=1000) -> None:
+        with self.driver.session() as session:
+            query:str = "MATCH (t1:Track), (t2:Track) WHERE id(t1) < id(t2) RETURN t1, t2"
+            result = session.run(query)
+            all_pairs: list = [(record['t1'], record['t2']) for record in result]
+            self.sampled_pairs: list = random.sample(all_pairs, batch_size)
+    
