@@ -49,9 +49,9 @@ class Neo4jDriver():
         """
         self.driver.close()
 
-    def set_schema(self) -> bool:
+    def set_spotify_schema(self) -> bool:
         """
-        Sets the session schema and drops the data in the database.
+        Sets the spotify schema and drops the data in the database.
         """
         try:
             with self.driver.session() as session:
@@ -89,7 +89,8 @@ class Neo4jDriver():
                     })-[:BY_ARTIST]->(artist)
                     -[:ON_ALBUM]->(album)
                 """)
-            return True
+                session.commit()
+                return True
         except:
             return False
 
