@@ -51,41 +51,77 @@ class Neo4jDriver():
             result = session.run("MATCH (n) DETACH DELETE n")
             print(f"Deleted {result.summary().counters.nodes_deleted} nodes and {result.summary().counters.relationships_deleted} edges")
 
-    def remove_node(self, label: str, node_id: int) -> None:
-        """
-        Removes a node with the given label and ID from the graph database.
-
-        Args:
-            label (str): The label of the node to remove.
-            node_id (int): The ID of the node to remove.
-        """
-        with self.driver.session() as session:
-            result = session.run(f"MATCH (n:{label} {{id: {node_id}}}) DETACH DELETE n")
-            print(f"Deleted {result.summary().counters.nodes_deleted} nodes and {result.summary().counters.relationships_deleted} edges")
-
-    def remove_edge(self, edge_type: str, start_node_id: int, end_node_id: int) -> None:
-        """
-        Removes an edge with the given type and start/end node IDs from the graph database.
-
-        Args:
-            edge_type (str): The type of the edge to remove.
-            start_node_id (int): The ID of the start node of the edge to remove.
-            end_node_id (int): The ID of the end node of the edge to remove.
-        """
-        with self.driver.session() as session:
-            result = session.run(f"MATCH (a)-[r:{edge_type}]->(b) WHERE a.id = {start_node_id} AND b.id = {end_node_id} DELETE r")
-            print(f"Deleted {result.summary().counters.relationships_deleted} edges")
 
     def create_node(self, label, **properties):
+        """
+        Creates a new node using the _create_node() staticmethod.
+        """
         with self.driver.session() as session:
             result = session.write_transaction(self._create_node, label, properties)
             return result
 
     @staticmethod
-    def _create_node(tx, label, properties):
+    def _create_node(tx, label:str, properties:dict):
+        """
+        Method to create nodes given a dictionary of properties.
+        """
         query = f"CREATE (n:{label} {{"
         for key, value in properties.items():
             query += f"{key}: '{value}',"
-        query = query[:-1] + "})"
+        query: str = query[:-1] + "})"
         result = tx.run(query)
         return result
+
+    def create_relationship(self, start_node_id:str, end_node_id:str, relationship_type:str) -> None:
+        """
+        Creates a new relationship between two nodes given their IDs and a relationship type.
+        """
+        with self.driver.session() as session:
+            tx = session.begin_transaction()
+            query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r:{relationship_type}]->(b)"
+            tx.run(query)
+            tx.commit()
+
+    def delete_node(self, node_id:str) -> None:
+        """
+        Deletes a node from the database given its ID.
+        """
+        with self.driver.session() as session:
+            tx = session.begin_transaction()
+            query: str = f"MATCH (n) WHERE ID(n)={node_id} DELETE n"
+            tx.run(query)
+            tx.commit()
+
+    def delete_relationship(self, relationship_id) -> None:
+        """
+        Deletes a relationship from the database given the relationship ID.
+        """
+        with self.driver.session() as session:
+            tx = session.begin_transaction()
+            query = f"MATCH ()-[r]-() WHERE ID(r)={relationship_id} DELETE r"
+            tx.run(query)
+            tx.commit()
+
+    def find_node_by_property(self, label, property_name, property_value) -> list:
+        """
+        Queries for a given node from a defined property name and value.
+        """
+        with self.driver.session() as session:
+            tx = session.begin_transaction()
+            query = f"MATCH (n:{label}) WHERE n.{property_name}='{property_value}' RETURN n"
+            result = tx.run(query)
+            records = [record["n"] for record in result]
+            tx.commit()
+            return records
+
+    def get_node_by_id(self, node_id):
+        """
+        Queries for a given node by its ID.
+        """
+        with self.driver.session() as session:
+            tx = session.begin_transaction()
+            query = f"MATCH (n) WHERE ID(n)={node_id} RETURN n"
+            result = tx.run(query)
+            record = result.single()["n"]
+            tx.commit()
+            return record
