@@ -122,7 +122,7 @@ class Neo4jDriver():
         """
         with self.driver.session() as session:
             tx = session.begin_transaction()
-            query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r:{relationship_type}]->(b)"
+            query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r: MATCHED{relationship_type}]->(b)"
             tx.run(query)
             tx.commit()
 
@@ -170,22 +170,13 @@ class Neo4jDriver():
             tx.commit()
             return record
 
-    @staticmethod
-    def cosine_similarity(node1, node2) -> float:
-        """
-        Method for calculating a metric threshold between two nodes based off of Cosine similarity. 
-        """
-        pass
-
-    def calculate_similarity(track1_id: str, track2_id: str, driver: Neo4jDriver) -> float:
+    def eucliean_distance(self, track1: str, track2: str) -> float:
         """
         Calculates the similarity score between two tracks based on their attribute values.
         """
-        track1 = driver.get_node_by_id(track1_id)
-        track2 = driver.get_node_by_id(track2_id)
 
         # List of attribute names to use for similarity calculation
-        attributes = [
+        attributes: list[str] = [
             "popularity", "duration_ms", "explicit", "danceability",
             "energy", "key", "loudness", "mode", "speechiness",
             "acousticness", "instrumentalness", "liveness", "valence",
@@ -193,16 +184,16 @@ class Neo4jDriver():
         ]
 
         # Calculate Euclidean distance between the tracks
-        distance = 0
+        distance:float = 0.
         for attribute in attributes:
-            range_min, range_max = driver.get_range(attribute)
+            range_min, range_max = self.driver.get_range(attribute)
             distance += (track1[attribute] - track2[attribute]) ** 2 / ((range_max - range_min) ** 2)
 
         # Normalize distance to a similarity score between 0 and 1
-        similarity = 1 / (1 + distance ** 0.5)
+        similarity:float = 1 / (1 + distance ** 0.5)
         return similarity
 
-    def evaluate_metrics(self, method=cosine_similarity()) -> bool:
+    def evaluate_metrics(self, method=eucliean_distance(), threshold=.5) -> bool:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
@@ -214,8 +205,9 @@ class Neo4jDriver():
                 for pair in self.sampled_pairs:
                     node1 = pair[0]
                     node2 = pair[1]
-                    similarity_score: np.ndarray = method(node1, node2)
-                    self.sim_scores = np.vstack([self.sim_scores, similarity_score])
+                    similarity_score: float = method(node1, node2)
+                    if similarity_score > threshold:
+                        self.create_relationship(node1, node2, f"sim_score: {similarity_score}")
             return True
         except:
             return False
