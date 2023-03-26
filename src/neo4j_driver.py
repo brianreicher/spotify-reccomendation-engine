@@ -3,6 +3,7 @@ import neo4j
 from neo4j import GraphDatabase
 import random
 import numpy as np
+from neo4j import Neo4jDriver
 
 
 class Neo4jDriver():
@@ -175,6 +176,31 @@ class Neo4jDriver():
         Method for calculating a metric threshold between two nodes based off of Cosine similarity. 
         """
         pass
+
+    def calculate_similarity(track1_id: str, track2_id: str, driver: Neo4jDriver) -> float:
+        """
+        Calculates the similarity score between two tracks based on their attribute values.
+        """
+        track1 = driver.get_node_by_id(track1_id)
+        track2 = driver.get_node_by_id(track2_id)
+
+        # List of attribute names to use for similarity calculation
+        attributes = [
+            "popularity", "duration_ms", "explicit", "danceability",
+            "energy", "key", "loudness", "mode", "speechiness",
+            "acousticness", "instrumentalness", "liveness", "valence",
+            "tempo", "time_signature"
+        ]
+
+        # Calculate Euclidean distance between the tracks
+        distance = 0
+        for attribute in attributes:
+            range_min, range_max = driver.get_range(attribute)
+            distance += (track1[attribute] - track2[attribute]) ** 2 / ((range_max - range_min) ** 2)
+
+        # Normalize distance to a similarity score between 0 and 1
+        similarity = 1 / (1 + distance ** 0.5)
+        return similarity
 
     def evaluate_metrics(self, method=cosine_similarity()) -> bool:
         """
