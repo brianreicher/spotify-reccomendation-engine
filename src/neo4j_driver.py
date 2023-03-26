@@ -133,3 +133,17 @@ class Neo4jDriver():
             record = result.single()["n"]
             tx.commit()
             return record
+
+    @staticmethod
+    def metric_threshold() -> float:
+        """
+        Method for calculating a metric threshold between two nodes based off of Euclidean distance. 
+        Meant to check if a relationship should be created between two nodes
+        """
+        pass
+
+    def evaluate_metrics(self, nbatch_size=1000) -> None:
+        """
+        Method for evaluating a given metric threshold over a random batch of nodes.
+        """
+        pass
