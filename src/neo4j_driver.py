@@ -1,6 +1,7 @@
 
 import neo4j
 from neo4j import GraphDatabase
+from neo4j import Neo4jDriver
 
 
 class Neo4jDriver():
@@ -163,13 +164,38 @@ class Neo4jDriver():
             tx.commit()
             return record
 
-    @staticmethod
-    def metric_threshold() -> float:
+    # @staticmethod
+    # def metric_threshold() -> float:
+    #     """
+    #     Method for calculating a metric threshold between two nodes based off of Euclidean distance. 
+    #     Meant to check if a relationship should be created between two nodes
+    #     """
+    #     pass
+
+    def calculate_similarity(track1_id: str, track2_id: str, driver: Neo4jDriver) -> float:
         """
-        Method for calculating a metric threshold between two nodes based off of Euclidean distance. 
-        Meant to check if a relationship should be created between two nodes
+        Calculates the similarity score between two tracks based on their attribute values.
         """
-        pass
+        track1 = driver.get_node_by_id(track1_id)
+        track2 = driver.get_node_by_id(track2_id)
+
+        # List of attribute names to use for similarity calculation
+        attributes = [
+            "popularity", "duration_ms", "explicit", "danceability",
+            "energy", "key", "loudness", "mode", "speechiness",
+            "acousticness", "instrumentalness", "liveness", "valence",
+            "tempo", "time_signature"
+        ]
+
+        # Calculate Euclidean distance between the tracks
+        distance = 0
+        for attribute in attributes:
+            range_min, range_max = driver.get_range(attribute)
+            distance += (track1[attribute] - track2[attribute]) ** 2 / ((range_max - range_min) ** 2)
+
+        # Normalize distance to a similarity score between 0 and 1
+        similarity = 1 / (1 + distance ** 0.5)
+        return similarity
 
     def evaluate_metrics(self, nbatch_size=1000) -> None:
         """
