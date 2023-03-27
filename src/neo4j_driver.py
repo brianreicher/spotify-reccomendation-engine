@@ -3,7 +3,6 @@ import neo4j
 from neo4j import GraphDatabase
 import random
 import numpy as np
-from neo4j import Neo4jDriver
 
 
 class Neo4jDriver():
@@ -193,7 +192,7 @@ class Neo4jDriver():
         similarity:float = 1 / (1 + distance ** 0.5)
         return similarity
 
-    def evaluate_metrics(self, method=eucliean_distance(), threshold=.5) -> bool:
+    def evaluate_metrics(self, method=eucliean_distance, threshold=.5) -> bool:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
@@ -202,11 +201,11 @@ class Neo4jDriver():
 
         try:
             for pair in self.sampled_pairs:
-                node1 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[0]} USING INDEX t:Track(id) RETURN t.id")
-                node2 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[1]} USING INDEX t:Track(id) RETURN t.id")
+                node1 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[0]} USING INDEX t:Track(id) RETURN t.id").single()[0]
+                node2 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[1]} USING INDEX t:Track(id) RETURN t.id").single()[0]
                 similarity_score: float = method(node1, node2)
                 if similarity_score > threshold:
-                    self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
+                    self.create_relationship(pair[0], pair[1], "MATCHED", f"{{sim_score: {similarity_score}}}")
             return True
         except:
             return False
