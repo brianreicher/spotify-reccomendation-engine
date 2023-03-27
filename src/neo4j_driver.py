@@ -181,7 +181,7 @@ class Neo4jDriver():
             tx.commit()
             return record
 
-    def eucliean_distance(track1: dict, track2: dict) -> float:
+    def eucliean_distance(self, track1: dict, track2: dict) -> float:
         """
         Calculates the similarity score between two tracks based on their attribute values.
         """
@@ -197,16 +197,14 @@ class Neo4jDriver():
         # Calculate Euclidean distance between the tracks
         distance:float = 0.
         for attribute in attributes:
-            # range_min, range_max = self.driver.get_range(attribute)
-            range_min: float = .002
-            range_max: float = 1.
+            range_min, range_max = self.driver.session().run(f"MATCH (t:Track) RETURN MIN(t.{attribute}), MAX(t.{attribute})").single()
             distance += (track1[attribute] - track2[attribute]) ** 2 / ((range_max - range_min) ** 2)
 
         # Normalize distance to a similarity score between 0 and 1
         similarity:float = 1 / (1 + distance ** 0.5)
         return similarity
 
-    def evaluate_metrics(self, method=eucliean_distance, threshold=.5) -> None:
+    def evaluate_metrics(self, threshold=.01e-6) -> None:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
@@ -221,7 +219,7 @@ class Neo4jDriver():
                     
                     if node1 != node2:
                         node2_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single()['t']._properties
-                        similarity_score: float = method(node1_values, node2_values)
+                        similarity_score: float = self.eucliean_distance(node1_values, node2_values)
                         print(similarity_score)
 
                         if similarity_score > threshold:
