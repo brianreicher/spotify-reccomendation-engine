@@ -3,7 +3,8 @@ import neo4j
 from neo4j import GraphDatabase
 import random
 import numpy as np
-
+import py2neo
+import pandas as pd
 
 class Neo4jDriver():
     """
@@ -48,51 +49,62 @@ class Neo4jDriver():
         """
         self.driver.close()
 
-    def set_spotify_schema(self) -> bool:
+    def print_greeting(self, message):
+        with self.driver.session() as session:
+            greeting = session.execute_write(self._create_and_return_greeting, message)
+            print(greeting)
+
+    @staticmethod
+    def _create_and_return_greeting(tx, message):
+        result = tx.run("CREATE (a:Greeting) "
+                        "SET a.message = $message "
+                        "RETURN a.message + ', from node ' + id(a)", message=message)
+        return result.single()[0]
+    
+
+    def set_spotify_schema(self) -> None:
         """
         Sets the spotify schema and drops the data in the database.
         """
-        try:
-            with self.driver.session() as session:
-                session.run("CREATE INDEX ON :Track(id)")
-                session.run("""
-                    LOAD CSV WITH HEADERS FROM '../data/spotify.csv' AS row
-                    MERGE (:Track {
-                    id: row.track_id,
-                    artist: row.artists,
-                    album: row.album_name,
-                    name: row.track_name,
-                    popularity: toInteger(row.popularity),
-                    duration_ms: toInteger(row.duration_ms),
-                    explicit: toBoolean(row.explicit),
-                    danceability: toFloat(row.danceability),
-                    energy: toFloat(row.energy),
-                    key: toInteger(row.key),
-                    loudness: toFloat(row.loudness),
-                    mode: toInteger(row.mode),
-                    speechiness: toFloat(row.speechiness),
-                    acousticness: toFloat(row.acousticness),
-                    instrumentalness: toFloat(row.instrumentalness),
-                    liveness: toFloat(row.liveness),
-                    valence: toFloat(row.valence),
-                    tempo: toFloat(row.tempo),
-                    time_signature: toInteger(row.time_signature),
-                    genre: row.track_genre
-                    })-[:BY_ARTIST]->(artist)
-                    -[:ON_ALBUM]->(album)
-                """)
-                session.commit()
-                return True
-        except:
-            return False
+        session = self.driver.session()
+
+        print("breakpoint 1")
+
+        query:str = """
+                    LOAD CSV WITH HEADERS FROM 'file:///spotify.csv' AS row
+                        CREATE (:Track {
+                        id: row.track_id,
+                        artist: row.artists,
+                        album: row.album_name,
+                        name: row.track_name,
+                        popularity: toInteger(row.popularity),
+                        duration_ms: toInteger(row.duration_ms),
+                        explicit: toBoolean(row.explicit),
+                        danceability: toFloat(row.danceability),
+                        energy: toFloat(row.energy),
+                        key: toInteger(row.key),
+                        loudness: toFloat(row.loudness),
+                        mode: toInteger(row.mode),
+                        speechiness: toFloat(row.speechiness),
+                        acousticness: toFloat(row.acousticness),
+                        instrumentalness: toFloat(row.instrumentalness),
+                        liveness: toFloat(row.liveness),
+                        valence: toFloat(row.valence),
+                        tempo: toFloat(row.tempo),
+                        time_signature: toInteger(row.time_signature),
+                        genre: row.track_genre
+                    })
+                    """
+
+        session.run(query)
 
     def flush_database(self) -> None:
         """
         Deletes all nodes and edges from the graph database.
         """
         with self.driver.session() as session:
-            result = session.run("MATCH (n) DETACH DELETE n")
-            print(f"Deleted {result.summary().counters.nodes_deleted} nodes and {result.summary().counters.relationships_deleted} edges")
+            session.run("MATCH (n) DETACH DELETE n")
+            print(f"Deleted all nodes and edges")
 
 
     def create_node(self, label, **properties):
@@ -215,6 +227,7 @@ class Neo4jDriver():
             query:str = "MATCH (t1:Track), (t2:Track) WHERE ID(t1) < ID(t2) RETURN ID(t1), ID(t2)"
             result = session.run(query)
             all_pairs: list = [(record['t1'], record['t2']) for record in result]
+            print(len(all_pairs))
             self.sampled_pairs: list = random.sample(all_pairs, batch_size)
 
     
@@ -222,10 +235,11 @@ class Neo4jDriver():
         """
         Given a track ID, finds recommended songs using the specified similarity metric and threshold.
         """
-    
+        recommended_songs:np.ndarray = np.zeros()
+
         # Get the top recommended songs
         with self.driver.session() as session:
-            query = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.id = '{track_id}' RETURN t2.id, t2.name ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
+            query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.id = '{track_id}' RETURN t2.id, t2.name ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
             result = session.run(query)
             for record in result:
                 recommended_songs.append(record['t2.id'])
@@ -233,22 +247,28 @@ class Neo4jDriver():
         return recommended_songs
 
 
-
-
-
 if __name__ == "__main__":
-    driving = Neo4jDriver("bolt://localhost:7687", "neo4j", "password")
-    driving.set_spotify_schema()
-    
-     # Find Regina Spektor node
-    regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
-    regina_node = regina_nodes[0]
-    regina_id = regina_node['id']
+    print("initialize driver")
+    driving: Neo4jDriver = Neo4jDriver("neo4j://localhost:7687", "neo4j", "password")
+    driving.connect()
+    print("driver working")
 
-     # Find 5 recommended songs for Regina Spektor
-    recommended_songs = driving.find_recommended_songs(regina_id, limit=5)
-    for song in recommended_songs:
-        print(song)
+    # drop existing database data
+    driving.flush_database()
+    # fill the db with spotify csv data
+    driving.set_spotify_schema()
+    driving.sample_pairs()
+    print(len(driving.sampled_pairs))
+    # driving.disconnect()
+     # Find Regina Spektor node
+    # regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
+    # regina_node = regina_nodes[0]
+    # regina_id = regina_node['id']
+
+    #  # Find 5 recommended songs for Regina Spektor
+    # recommended_songs = driving.find_recommended_songs(regina_id, limit=5)
+    # for song in recommended_songs:
+    #     print(song)
     
 
 
