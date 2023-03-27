@@ -47,7 +47,7 @@ class Neo4jDriver():
         """
         self.driver.close()
 
-    def print_greeting(self, message):
+    def print_greeting(self, message) -> None:
         with self.driver.session() as session:
             greeting = session.execute_write(self._create_and_return_greeting, message)
             print(greeting)
@@ -260,9 +260,9 @@ if __name__ == "__main__":
     print("driver working")
 
     # # drop existing database data
-    # driving.flush_database()
+    driving.flush_database()
     # # fill the db with spotify csv data
-    # driving.set_spotify_schema()
+    driving.set_spotify_schema()
     # print("Data dropped")
 
     # # set randomly sampled tracks
@@ -284,7 +284,3 @@ if __name__ == "__main__":
     #     print(song)
 
     driving.disconnect()
-
-
-
-    
