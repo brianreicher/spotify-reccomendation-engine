@@ -32,7 +32,7 @@ class Neo4jDriver():
 
         # storage of similarity scores
         self.sim_scores: np.ndarray = np.empty((0,3))
-        self.sampled_pairs:list = []
+        self.random_nodes:list = []
 
     def connect(self) -> None:
         """
@@ -181,7 +181,7 @@ class Neo4jDriver():
             tx.commit()
             return record
 
-    def eucliean_distance(self, track1: str, track2: str) -> float:
+    def eucliean_distance(self, track1: dict, track2: dict) -> float:
         """
         Calculates the similarity score between two tracks based on their attribute values.
         """
@@ -204,30 +204,37 @@ class Neo4jDriver():
         similarity:float = 1 / (1 + distance ** 0.5)
         return similarity
 
-    def evaluate_metrics(self, method=eucliean_distance, threshold=.5) -> bool:
+    def evaluate_metrics(self, method=eucliean_distance, threshold=.5) -> None:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
-        if self.sampled_pairs is None:
-            self.sample_pairs()
+        if len(self.random_nodes)==0:
+            self.random_nodes()
 
-        try:
-            for pair in self.sampled_pairs:
-                node1 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[0]} USING INDEX t:Track(id) RETURN t.id").single()[0]
-                node2 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[1]} USING INDEX t:Track(id) RETURN t.id").single()[0]
-                similarity_score: float = method(node1, node2)
-                if similarity_score > threshold:
-                    self.create_relationship(pair[0], pair[1], "MATCHED", f"{{sim_score: {similarity_score}}}")
-            return True
-        except:
-            return False
+        with self.driver.session() as session:
+            print('breakpoint 1')
+
+            for node1 in self.random_nodes:
+                for pair_node in range(0, len(self.random_nodes)):
+                    print('breakpoint 2')
+                    node2 = self.random_nodes[pair_node]
+
+                    node1_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single())
+                    print(node1_values)
+                    if node1 != node2:
+                        print('breakpoint 3')
+                        node2_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single())
+                        print('breakpoint 4')
+                        similarity_score: float = method(node1_values, node2_values)
+                        if similarity_score > threshold:
+                            self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def sample_pairs(self, batch_size=1000) -> None:
         with self.driver.session() as session:
-            query:str = "MATCH (t:Track) WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT 1000"
+            query:str = f"MATCH (t:Track) WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT {batch_size}"
             result = session.run(query)
             for record in result:
-                self.sampled_pairs.append(record["track_id"])
+                self.random_nodes.append(record["track_id"])
     
     def find_recommended_songs(self, track_id: str, num_recommendations=5):
         """
@@ -258,8 +265,10 @@ if __name__ == "__main__":
     # driving.flush_database()
     # fill the db with spotify csv data
     # driving.set_spotify_schema()
+
+    # set randomly sampled tracks
     driving.sample_pairs()
-    print(len(driving.sampled_pairs))
+    driving.evaluate_metrics()
     # driving.disconnect()
      # Find Regina Spektor node
     # regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
