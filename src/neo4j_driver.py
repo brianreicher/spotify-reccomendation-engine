@@ -136,6 +136,7 @@ class Neo4jDriver():
             query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r:{relationship_type} {props}]->(b)"
             tx.run(query)
             tx.commit()
+            print("success")
 
     def delete_node(self, node_id:str) -> None:
         """
@@ -186,23 +187,28 @@ class Neo4jDriver():
         Calculates the similarity score between two tracks based on their attribute values.
         """
 
-        # List of attribute names to use for similarity calculation
-        attributes: list[str] = [
-            "popularity", "duration_ms", "danceability",
-            "energy", "key", "loudness", "mode", "speechiness",
-            "acousticness", "instrumentalness", "liveness", "valence",
-            "tempo", "time_signature"
-        ]
+        def process_dict(d) -> np.ndarray:
+            # Define a list of keys to exclude from the array
+            exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id']
+
+            # Create a list of numerical values, mapping True/False to 1/0
+            values = []
+            for key, value in d.items():
+                if key not in exclude_keys:
+                    if isinstance(value, bool):
+                        values.append(int(value))
+                    elif isinstance(value, (int, float)):
+                        values.append(value)
+
+            # Convert the list to a NumPy array
+            return np.array(values)
+        
+        # convert the two dicts
+        t1: np.ndarray = process_dict(track1)
+        t2: np.ndarray = process_dict(track2)
 
         # Calculate Euclidean distance between the tracks
-        distance:float = 0.
-        for attribute in attributes:
-            range_min, range_max = self.driver.session().run(f"MATCH (t:Track) RETURN MIN(t.{attribute}), MAX(t.{attribute})").single()
-            distance += (track1[attribute] - track2[attribute]) ** 2 / ((range_max - range_min) ** 2)
-
-        # Normalize distance to a similarity score between 0 and 1
-        similarity:float = 1 / (1 + distance ** 0.5)
-        return similarity
+        return 1/ (np.linalg.norm((t1-t2))+1)
 
     def evaluate_metrics(self, threshold=.01e-6) -> None:
         """
