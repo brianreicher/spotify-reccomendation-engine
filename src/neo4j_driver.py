@@ -177,7 +177,7 @@ class Neo4jDriver():
 
         # List of attribute names to use for similarity calculation
         attributes: list[str] = [
-            "popularity", "duration_ms", "explicit", "danceability",
+            "popularity", "duration_ms", "danceability",
             "energy", "key", "loudness", "mode", "speechiness",
             "acousticness", "instrumentalness", "liveness", "valence",
             "tempo", "time_signature"
@@ -202,8 +202,8 @@ class Neo4jDriver():
 
         try:
             for pair in self.sampled_pairs:
-                node1 = pair[0]
-                node2 = pair[1]
+                node1 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[0]} USING INDEX t:Track(id) RETURN t.id")
+                node2 = self.driver.run(f"MATCH (t:Track) WHERE t.id = {pair[1]} USING INDEX t:Track(id) RETURN t.id")
                 similarity_score: float = method(node1, node2)
                 if similarity_score > threshold:
                     self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
@@ -213,7 +213,7 @@ class Neo4jDriver():
 
     def sample_pairs(self, batch_size=1000) -> None:
         with self.driver.session() as session:
-            query:str = "MATCH (t1:Track), (t2:Track) WHERE id(t1) < id(t2) RETURN t1, t2"
+            query:str = "MATCH (t1:Track), (t2:Track) WHERE ID(t1) < ID(t2) RETURN ID(t1), ID(t2)"
             result = session.run(query)
             all_pairs: list = [(record['t1'], record['t2']) for record in result]
             self.sampled_pairs: list = random.sample(all_pairs, batch_size)
