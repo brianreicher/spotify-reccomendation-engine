@@ -220,6 +220,8 @@ class Neo4jDriver():
 
 if __name__ == "__main__":
     driving = Neo4jDriver("bolt://localhost:7687", "neo4j", "password")
+    driving.set_spotify_schema()
+    
      # Find Regina Spektor node
     regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
     regina_node = regina_nodes[0]
