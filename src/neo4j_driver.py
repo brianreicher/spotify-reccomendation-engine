@@ -116,13 +116,13 @@ class Neo4jDriver():
         result = tx.run(query)
         return result
 
-    def create_relationship(self, start_node_id:str, end_node_id:str, relationship_type:str) -> None:
+    def create_relationship(self, start_node_id:str, end_node_id:str, relationship_type:str, props:str) -> None:
         """
         Creates a new relationship between two nodes given their IDs and a relationship type.
         """
         with self.driver.session() as session:
             tx = session.begin_transaction()
-            query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r: MATCHED{relationship_type}]->(b)"
+            query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r:{relationship_type} {props}]->(b)"
             tx.run(query)
             tx.commit()
 
@@ -201,13 +201,12 @@ class Neo4jDriver():
             self.sample_pairs()
 
         try:
-            with self.driver.session() as session:
-                for pair in self.sampled_pairs:
-                    node1 = pair[0]
-                    node2 = pair[1]
-                    similarity_score: float = method(node1, node2)
-                    if similarity_score > threshold:
-                        self.create_relationship(node1, node2, f"sim_score: {similarity_score}")
+            for pair in self.sampled_pairs:
+                node1 = pair[0]
+                node2 = pair[1]
+                similarity_score: float = method(node1, node2)
+                if similarity_score > threshold:
+                    self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
             return True
         except:
             return False
