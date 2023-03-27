@@ -181,7 +181,7 @@ class Neo4jDriver():
             tx.commit()
             return record
 
-    def eucliean_distance(self, track1: dict, track2: dict) -> float:
+    def eucliean_distance(track1: dict, track2: dict) -> float:
         """
         Calculates the similarity score between two tracks based on their attribute values.
         """
@@ -197,7 +197,9 @@ class Neo4jDriver():
         # Calculate Euclidean distance between the tracks
         distance:float = 0.
         for attribute in attributes:
-            range_min, range_max = self.driver.get_range(attribute)
+            # range_min, range_max = self.driver.get_range(attribute)
+            range_min: float = .002
+            range_max: float = 1.
             distance += (track1[attribute] - track2[attribute]) ** 2 / ((range_max - range_min) ** 2)
 
         # Normalize distance to a similarity score between 0 and 1
@@ -219,13 +221,15 @@ class Neo4jDriver():
                     print('breakpoint 2')
                     node2 = self.random_nodes[pair_node]
 
-                    node1_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single())
+                    node1_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single())['t']
+                    print(node1_values)
                     print(node1_values)
                     if node1 != node2:
                         print('breakpoint 3')
-                        node2_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single())
+                        node2_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single())['t'].properties
                         print('breakpoint 4')
                         similarity_score: float = method(node1_values, node2_values)
+                        print(similarity_score)
                         if similarity_score > threshold:
                             self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
@@ -269,7 +273,7 @@ if __name__ == "__main__":
     # set randomly sampled tracks
     driving.sample_pairs()
     driving.evaluate_metrics()
-    # driving.disconnect()
+
      # Find Regina Spektor node
     # regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
     # regina_node = regina_nodes[0]
@@ -279,7 +283,9 @@ if __name__ == "__main__":
     # recommended_songs = driving.find_recommended_songs(regina_id, limit=5)
     # for song in recommended_songs:
     #     print(song)
-    
+
+    driving.disconnect()
+
 
 
     
