@@ -237,6 +237,9 @@ class Neo4jDriver():
         """
         recommended_songs:np.ndarray = np.zeros()
 
+        # Create the relationships across the entire graph 
+        self.evaluate_metrics()
+    
         # Get the top recommended songs
         with self.driver.session() as session:
             query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.id = '{track_id}' RETURN t2.id, t2.name ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
