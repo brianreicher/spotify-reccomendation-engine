@@ -56,7 +56,7 @@ class Neo4jDriver():
             with self.driver.session() as session:
                 session.run("CREATE INDEX ON :Track(id)")
                 session.run("""
-                    LOAD CSV WITH HEADERS FROM 'spotify.csv' AS row
+                    LOAD CSV WITH HEADERS FROM '../data/spotify.csv' AS row
                     MERGE (:Track {
                     id: row.track_id,
                     artist: row.artists,
