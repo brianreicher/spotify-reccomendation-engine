@@ -222,6 +222,9 @@ class Neo4jDriver():
         """
         Given a track ID, finds recommended songs using the specified similarity metric and threshold.
         """
+
+        # Create the relationships across the entire graph 
+        self.evaluate_metrics()
     
         # Get the top recommended songs
         with self.driver.session() as session:
