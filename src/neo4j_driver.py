@@ -216,4 +216,20 @@ class Neo4jDriver():
             result = session.run(query)
             all_pairs: list = [(record['t1'], record['t2']) for record in result]
             self.sampled_pairs: list = random.sample(all_pairs, batch_size)
+
+
+if __name__ == "__main__":
+    driving = Neo4jDriver("bolt://localhost:7687", "neo4j", "password")
+     # Find Regina Spektor node
+    regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
+    regina_node = regina_nodes[0]
+    regina_id = regina_node['id']
+
+     # Find 5 recommended songs for Regina Spektor
+    recommended_songs = driving.find_recommended_songs(regina_id, limit=5)
+    for song in recommended_songs:
+        print(song)
+    
+
+
     
