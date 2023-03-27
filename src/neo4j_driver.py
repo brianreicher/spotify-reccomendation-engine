@@ -1,10 +1,8 @@
 
 import neo4j
 from neo4j import GraphDatabase
-import random
 import numpy as np
-import py2neo
-import pandas as pd
+from tqdm import tqdm
 
 class Neo4jDriver():
     """
@@ -136,7 +134,6 @@ class Neo4jDriver():
             query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r:{relationship_type} {props}]->(b)"
             tx.run(query)
             tx.commit()
-            print("success")
 
     def delete_node(self, node_id:str) -> None:
         """
@@ -192,7 +189,7 @@ class Neo4jDriver():
             exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id']
 
             # Create a list of numerical values, mapping True/False to 1/0
-            values = []
+            values:list = []
             for key, value in d.items():
                 if key not in exclude_keys:
                     if isinstance(value, bool):
@@ -215,10 +212,10 @@ class Neo4jDriver():
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
         if len(self.random_nodes)==0:
-            self.random_nodes()
+            self.random_sample()
 
         with self.driver.session() as session:
-            for node1 in self.random_nodes:
+            for node1 in tqdm(self.random_nodes):
                 for pair_node in range(0, len(self.random_nodes)):
                     node2 = self.random_nodes[pair_node]
                     node1_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single()['t']._properties
@@ -226,20 +223,18 @@ class Neo4jDriver():
                     if node1 != node2:
                         node2_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single()['t']._properties
                         similarity_score: float = self.eucliean_distance(node1_values, node2_values)
-                        print(similarity_score)
 
                         if similarity_score > threshold:
-                            print('addidng relationship')
                             self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
-    def sample_pairs(self, batch_size=1000) -> None:
+    def random_sample(self, batch_size=1000) -> None:
         with self.driver.session() as session:
             query:str = f"MATCH (t:Track) WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT {batch_size}"
             result = session.run(query)
             for record in result:
                 self.random_nodes.append(record["track_id"])
     
-    def find_recommended_songs(self, track_id: str, num_recommendations=5):
+    def find_recommended_songs(self, track_id: str, num_recommendations=5) -> np.ndarray:
         """
         Given a track ID, finds recommended songs using the specified similarity metric and threshold.
         """
@@ -264,15 +259,20 @@ if __name__ == "__main__":
     driving.connect()
     print("driver working")
 
-    # drop existing database data
+    # # drop existing database data
     # driving.flush_database()
-    # fill the db with spotify csv data
+    # # fill the db with spotify csv data
     # driving.set_spotify_schema()
+    # print("Data dropped")
 
-    # set randomly sampled tracks
-    driving.sample_pairs()
+    # # set randomly sampled tracks
+    driving.random_sample(batch_size=1500)
+    # print("Sampling complete")
+
     driving.evaluate_metrics()
-
+    print("metrics evaluated")
+    print(driving.random_nodes)
+    # driving.find_recommended_songs()
      # Find Regina Spektor node
     # regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
     # regina_node = regina_nodes[0]
