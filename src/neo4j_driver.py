@@ -32,7 +32,7 @@ class Neo4jDriver():
 
         # storage of similarity scores
         self.sim_scores: np.ndarray = np.empty((0,3))
-        self.sampled_pairs = None
+        self.sampled_pairs:list = []
 
     def connect(self) -> None:
         """
@@ -224,12 +224,10 @@ class Neo4jDriver():
 
     def sample_pairs(self, batch_size=1000) -> None:
         with self.driver.session() as session:
-            query:str = "MATCH (t1:Track), (t2:Track) WHERE ID(t1) < ID(t2) RETURN ID(t1), ID(t2)"
+            query:str = "MATCH (t:Track) WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT 1000"
             result = session.run(query)
-            all_pairs: list = [(record['t1'], record['t2']) for record in result]
-            print(len(all_pairs))
-            self.sampled_pairs: list = random.sample(all_pairs, batch_size)
-
+            for record in result:
+                self.sampled_pairs.append(record["track_id"])
     
     def find_recommended_songs(self, track_id: str, num_recommendations=5):
         """
@@ -257,9 +255,9 @@ if __name__ == "__main__":
     print("driver working")
 
     # drop existing database data
-    driving.flush_database()
+    # driving.flush_database()
     # fill the db with spotify csv data
-    driving.set_spotify_schema()
+    # driving.set_spotify_schema()
     driving.sample_pairs()
     print(len(driving.sampled_pairs))
     # driving.disconnect()
