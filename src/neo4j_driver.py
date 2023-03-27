@@ -214,23 +214,18 @@ class Neo4jDriver():
             self.random_nodes()
 
         with self.driver.session() as session:
-            print('breakpoint 1')
-
             for node1 in self.random_nodes:
                 for pair_node in range(0, len(self.random_nodes)):
-                    print('breakpoint 2')
                     node2 = self.random_nodes[pair_node]
-
-                    node1_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single())['t']
-                    print(node1_values)
-                    print(node1_values)
+                    node1_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single()['t']._properties
+                    
                     if node1 != node2:
-                        print('breakpoint 3')
-                        node2_values:dict = dict(session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single())['t'].properties
-                        print('breakpoint 4')
+                        node2_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single()['t']._properties
                         similarity_score: float = method(node1_values, node2_values)
                         print(similarity_score)
+
                         if similarity_score > threshold:
+                            print('addidng relationship')
                             self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def sample_pairs(self, batch_size=1000) -> None:
