@@ -217,6 +217,24 @@ class Neo4jDriver():
             all_pairs: list = [(record['t1'], record['t2']) for record in result]
             self.sampled_pairs: list = random.sample(all_pairs, batch_size)
 
+    
+    def find_recommended_songs(self, track_id: str, num_recommendations=5):
+        """
+        Given a track ID, finds recommended songs using the specified similarity metric and threshold.
+        """
+    
+        # Get the top recommended songs
+        with self.driver.session() as session:
+            query = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.id = '{track_id}' RETURN t2.id, t2.name ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
+            result = session.run(query)
+            for record in result:
+                recommended_songs.append(record['t2.id'])
+        
+        return recommended_songs
+
+
+
+
 
 if __name__ == "__main__":
     driving = Neo4jDriver("bolt://localhost:7687", "neo4j", "password")
