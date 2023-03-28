@@ -184,6 +184,13 @@ class Neo4jDriver():
                         self.create_relationship(node_artist, pair_node, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def normalize_data(self) -> np.ndarray:
+        """
+        Normalizes the features of the tracks
+
+        Returns:
+            np.ndarray: The normalized features of the tracks.
+
+        """
         # Get the top recommended songs
         with self.driver.session() as session:
             for key in self.track_keys:
