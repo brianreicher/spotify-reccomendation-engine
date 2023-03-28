@@ -55,6 +55,7 @@ class Neo4jDriver():
     def disconnect(self) -> None:
         """
         Disconnects from the Neo4j server.
+
         """
         self.driver.close()    
 
@@ -105,6 +106,12 @@ class Neo4jDriver():
     def create_relationship(self, start_node_id:str, end_node_id:str, relationship_type:str, props:str) -> None:
         """
         Creates a new relationship between two nodes given their IDs and a relationship type.
+
+        Args:
+            start_node_id (str): The ID of the start node.
+            end_node_id (str): The ID of the end node.
+            relationship_type (str): The type of relationship to create.
+            props (str): The properties of the relationship.
         """
         with self.driver.session() as session:
             # beings transaction
@@ -118,6 +125,13 @@ class Neo4jDriver():
     def eucliean_distance(self, track1: dict, track2: dict) -> float:
         """
         Calculates the similarity score between two tracks based on their attribute values.
+
+        Args:
+            track1 (dict): The first track.
+            track2 (dict): The second track.
+
+        Returns:
+            float: The similarity score between the two tracks.
         """
 
         def process_dict(d) -> np.ndarray:
@@ -145,6 +159,9 @@ class Neo4jDriver():
     def evaluate_metrics(self, threshold=0) -> None:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
+
+        Args:
+            threshold (float): The threshold to evaluate whether a relationship should be created .
         """
         if len(self.random_nodes)==0: # check if the database has been randomly sampled
             self.random_sample()
@@ -167,6 +184,13 @@ class Neo4jDriver():
                         self.create_relationship(node_artist, pair_node, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def normalize_data(self) -> np.ndarray:
+        """
+        Normalizes the features of the tracks
+
+        Returns:
+            np.ndarray: The normalized features of the tracks.
+
+        """
         # Get the top recommended songs
         with self.driver.session() as session:
             for key in self.track_keys:
@@ -176,7 +200,7 @@ class Neo4jDriver():
                     result = session.run(query)
                     record = result.single()
                     self.max_min_values[key] = (record[f"max_{key}"], record[f"min_{key}"])
-            
+
             # normalize all features for all random nodes
             print("break1")
             for ele in tqdm(self.random_nodes):
@@ -213,6 +237,10 @@ class Neo4jDriver():
     def random_sample(self, batch_size=1500, artist="Regina Spektor") -> None:
         """
         Randomly sampled the database with a given batch size for a given artist.
+
+        Args:
+            batch_size (int): The size of the batch to sample.
+            artist (str): The artist to include in the sample.
         """
         with self.driver.session() as session:
             # query string for random songs
@@ -231,6 +259,13 @@ class Neo4jDriver():
     def find_recommended_songs(self, num_recommendations=10, artist="Regina Spektor") -> set:
         """
         Given an artist, finds recommended songs using to a certain number
+
+        Args:
+            num_recommendations (int): The number of recommendations to return.
+            artist (str): The artist to find recommendations for.
+
+        Returns:
+            set: The set of recommended songs.
         """
         # initialized a list of random songs
         recommended_songs: list = []
