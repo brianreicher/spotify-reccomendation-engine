@@ -121,17 +121,18 @@ class Neo4jDriver():
         """
 
         def process_dict(d) -> np.ndarray:
-            # MATCH (p:Track) RETURN MAX(p.ATTRIBUTE YOU WANT) AS max_price, MIN(p.ATTRIBUTE YOU WANT) AS min_price
-            # Create a list of numerical values, mapping True/False to 1/0
+            """
+            Processes input dictionaries to scrape numerical and boolean values to add to sim score vector.
+            """
             values:list = []
             for key, value in d.items():
-                if key not in self.exclude_keys:
-                    if isinstance(value, bool):
+                if key not in self.exclude_keys: # ignore element if it is in the ignore list
+                    if isinstance(value, bool): # map booleans to 0/1
                         values.append(int(value))
-                    elif isinstance(value, (int, float)):
+                    elif isinstance(value, (int, float)): # extract floats/ints
                         values.append(value)
 
-            # Convert the list to a NumPy array
+            # Convert the list to a Numpy array
             return np.array(values)
         
         # convert the two dicts
@@ -145,23 +146,30 @@ class Neo4jDriver():
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
-        if len(self.random_nodes)==0:
+        if len(self.random_nodes)==0: # check if the database has been randomly sampled
             self.random_sample()
             print("randomly sampled")
 
         with self.driver.session() as session:
-            for node_artist in self.artists_nodes:
+            # run for every node of the artist's tracks in question
+            for node_artist in self.artists_nodes: 
+                # create a dict of the track props
+                node1_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node_artist} RETURN t").single()['t']._properties
                 for pair_node in tqdm(self.random_nodes):
-                    node1_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node_artist} RETURN t").single()['t']._properties
-                    
+                    # create a dictionary of the random props
                     node2_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {pair_node} RETURN t").single()['t']._properties
 
+                    # eval the sim score
                     similarity_score: float = self.eucliean_distance(node1_values, node2_values)
 
+                    # create a relationship if the sim score is above the threshold
                     if similarity_score > threshold:
                         self.create_relationship(node_artist, pair_node, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def normalize_data(self) -> np.ndarray:
+        """
+        Utilized full-dataset min/max to normalize the data in the sample set.
+        """
         # Get the top recommended songs
         with self.driver.session() as session:
             for key in self.track_keys:
@@ -203,34 +211,40 @@ class Neo4jDriver():
                                 pass
                         
     def random_sample(self, batch_size=1500, artist="Regina Spektor") -> None:
+        """
+        Randomly sampled the database with a given batch size for a given artist.
+        """
         with self.driver.session() as session:
+            # query string for random songs
             query:str = f"MATCH (t:Track) WHERE NOT t.artist = '{artist}' WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT {batch_size}"
             result = session.run(query)
+            # appends to the random node list the track IDs
             for record in result:
                 self.random_nodes.append(record["track_id"])
-
+            # query string for artist songs
             query_artist: str = f"MATCH (t:Track) WHERE t.artist = '{artist}' RETURN ID(t) AS track_id"
             res_art = session.run(query_artist)
-
+            # append to the artist node lsit the track IDs
             for rec in res_art:
                 self.artists_nodes.append(rec['track_id'])
 
-    def find_recommended_songs(self, num_recommendations=10, artist="Regina Spektor") -> np.ndarray:
+    def find_recommended_songs(self, num_recommendations=10, artist="Regina Spektor") -> set:
         """
-        Given a track ID, finds recommended songs using the specified similarity metric and threshold.
+        Given an artist, finds recommended songs using to a certain number
         """
+        # 
+        # initialized a list of random songs
         recommended_songs: list = []
 
-        # Create the relationships across the entire graph 
-        # self.evaluate_metrics()
-    
         # Get the top recommended songs
         with self.driver.session() as session:
             query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.artist = '{artist}' RETURN t2.id, t2.name, t2.artist ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
             result = session.run(query)
+            # append the name and artist to the song lsit
             for record in result:
                 recommended_songs.append(f"{record['t2.name']}, {record['t2.artist']}")
         
+        # return unique songs
         return set(recommended_songs)
 
 
@@ -241,23 +255,26 @@ if __name__ == "__main__":
     print("driver working")
 
     # drop existing database data
-    # driving.flush_database()
+    driving.flush_database()
     print("Data flushed")
 
     # fill the db with spotify csv data
-    # driving.set_spotify_schema()
+    driving.set_spotify_schema()
     print("Data added")
 
-    # # set randomly sampled tracks
+    # set randomly sampled tracks
     if len(driving.random_nodes) == 0:
         driving.random_sample(batch_size=1000)
         print("Sampling complete")
-        print(len(driving.random_nodes))
-        print(len(driving.artists_nodes))
+
 
     # normalize the data
     driving.normalize_data()
+
+    # evaluate similarity metrics
     driving.evaluate_metrics()
+
+    # query the top reccomended songs and print
     songs: list = driving.find_recommended_songs()
     print(songs)
 
