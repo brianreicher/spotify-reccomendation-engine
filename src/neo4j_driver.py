@@ -227,14 +227,21 @@ class Neo4jDriver():
                         if similarity_score > threshold:
                             self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
-    def random_sample(self, batch_size=1000) -> None:
+    def random_sample(self, batch_size=1500, artist="Regina Spektor") -> None:
         with self.driver.session() as session:
-            query:str = f"MATCH (t:Track) WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT {batch_size}"
+            query:str = f"MATCH (t:Track) WHERE NOT t.artist = '{artist}' WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT {batch_size}"
             result = session.run(query)
             for record in result:
                 self.random_nodes.append(record["track_id"])
+
+            query_artist: str = f"MATCH (t:Track) WHERE t.artist = '{artist}' RETURN t.track_id AS track_id"
+            res_art = session.run(query_artist)
+
+            for rec in res_art:
+                self.random_nodes.append(rec['track_id'])
+
     
-    def find_recommended_songs(self, track_id: str, num_recommendations=5) -> np.ndarray:
+    def find_recommended_songs(self, track_id: str, num_recommendations=5, artist="Regina Spektor") -> np.ndarray:
         """
         Given a track ID, finds recommended songs using the specified similarity metric and threshold.
         """
@@ -260,18 +267,19 @@ if __name__ == "__main__":
     print("driver working")
 
     # # drop existing database data
-    driving.flush_database()
+    # driving.flush_database()
     # # fill the db with spotify csv data
-    driving.set_spotify_schema()
-    # print("Data dropped")
+    # driving.set_spotify_schema()
+    print("Data dropped")
 
     # # set randomly sampled tracks
-    driving.random_sample(batch_size=1500)
+    driving.random_sample()
     # print("Sampling complete")
+    print(len(driving.random_nodes))
 
     driving.evaluate_metrics()
     print("metrics evaluated")
-    print(driving.random_nodes)
+  
     # driving.find_recommended_songs()
      # Find Regina Spektor node
     # regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
@@ -283,4 +291,4 @@ if __name__ == "__main__":
     # for song in recommended_songs:
     #     print(song)
 
-    driving.disconnect()
+    # driving.disconnect()
