@@ -38,7 +38,7 @@ class Neo4jDriver():
                                       'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
                                       'time_signature', 'genre']
 
-        self.exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id', '']
+        self.exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id', 'explicit']
 
         # max and min values for each key, evalutated later
         self.max_min_values: dict = {}
