@@ -237,7 +237,7 @@ class Neo4jDriver():
 
         # Get the top recommended songs
         with self.driver.session() as session:
-            query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.artist = '{artist}' RETURN t2.id, t2.name, t2.artist ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
+            query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.artist = '{artist}' RETURN t2.id, t2.name, t2.artist ORDER BY r.sim_score ASC LIMIT {num_recommendations}"
             result = session.run(query)
             # append the name and artist to the song lsit
             for record in result:
