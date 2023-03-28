@@ -31,6 +31,7 @@ class Neo4jDriver():
         # storage of similarity scores
         self.sim_scores: np.ndarray = np.empty((0,3))
         self.random_nodes:list = []
+        self.artists_nodes: list = []
 
     def connect(self) -> None:
         """
@@ -65,8 +66,6 @@ class Neo4jDriver():
         Sets the spotify schema and drops the data in the database.
         """
         session = self.driver.session()
-
-        print("breakpoint 1")
 
         query:str = """
                     LOAD CSV WITH HEADERS FROM 'file:///spotify.csv' AS row
@@ -213,19 +212,19 @@ class Neo4jDriver():
         """
         if len(self.random_nodes)==0:
             self.random_sample()
+            print("randomly sampled")
 
         with self.driver.session() as session:
-            for node1 in tqdm(self.random_nodes):
-                for pair_node in range(0, len(self.random_nodes)):
-                    node2 = self.random_nodes[pair_node]
-                    node1_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node1} RETURN t").single()['t']._properties
+            for node_artist in self.artists_nodes:
+                for pair_node in tqdm(self.random_nodes):
+                    node1_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node_artist} RETURN t").single()['t']._properties
                     
-                    if node1 != node2:
-                        node2_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {node2} RETURN t").single()['t']._properties
-                        similarity_score: float = self.eucliean_distance(node1_values, node2_values)
+                    node2_values:dict = session.run(f"MATCH (t:Track) WHERE ID(t) = {pair_node} RETURN t").single()['t']._properties
 
-                        if similarity_score > threshold:
-                            self.create_relationship(node1, node2, "MATCHED", f"{{sim_score: {similarity_score}}}")
+                    similarity_score: float = self.eucliean_distance(node1_values, node2_values)
+
+                    if similarity_score > threshold:
+                        self.create_relationship(node_artist, pair_node, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def random_sample(self, batch_size=1500, artist="Regina Spektor") -> None:
         with self.driver.session() as session:
@@ -234,13 +233,12 @@ class Neo4jDriver():
             for record in result:
                 self.random_nodes.append(record["track_id"])
 
-            query_artist: str = f"MATCH (t:Track) WHERE t.artist = '{artist}' RETURN t.track_id AS track_id"
+            query_artist: str = f"MATCH (t:Track) WHERE t.artist = '{artist}' RETURN ID(t) AS track_id"
             res_art = session.run(query_artist)
 
             for rec in res_art:
-                self.random_nodes.append(rec['track_id'])
+                self.artists_nodes.append(rec['track_id'])
 
-    
     def find_recommended_songs(self, track_id: str, num_recommendations=5, artist="Regina Spektor") -> np.ndarray:
         """
         Given a track ID, finds recommended songs using the specified similarity metric and threshold.
@@ -276,7 +274,7 @@ if __name__ == "__main__":
     driving.random_sample()
     # print("Sampling complete")
     print(len(driving.random_nodes))
-
+    print(len(driving.artists_nodes))
     driving.evaluate_metrics()
     print("metrics evaluated")
   
