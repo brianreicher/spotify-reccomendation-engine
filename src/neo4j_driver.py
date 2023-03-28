@@ -28,18 +28,20 @@ class Neo4jDriver():
         self.password: str = password
         self.driver: GraphDatabase.driver = None
 
-        # storage of similarity scores
-        self.sim_scores: np.ndarray = np.empty((0,3))
+        # storage of random and artist nodes
         self.random_nodes:list = []
         self.artists_nodes: list = []
-        
+
+        # track keys and exclude keys for sim score computation
         self.track_keys: list[str] = ['id', 'artist', 'album', 'name', 'popularity', 'duration_ms', 'explicit',
                                       'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
                                       'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
                                       'time_signature', 'genre']
 
-        # Define a list of keys to exclude from the array
-        self.exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id']
+        self.exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id', '']
+
+        # max and min values for each key, evalutated later
+        self.max_min_values: dict = {}
 
     def connect(self) -> None:
         """
@@ -54,20 +56,7 @@ class Neo4jDriver():
         """
         Disconnects from the Neo4j server.
         """
-        self.driver.close()
-
-    def print_greeting(self, message) -> None:
-        with self.driver.session() as session:
-            greeting = session.execute_write(self._create_and_return_greeting, message)
-            print(greeting)
-
-    @staticmethod
-    def _create_and_return_greeting(tx, message):
-        result = tx.run("CREATE (a:Greeting) "
-                        "SET a.message = $message "
-                        "RETURN a.message + ', from node ' + id(a)", message=message)
-        return result.single()[0]
-    
+        self.driver.close()    
 
     def set_spotify_schema(self) -> None:
         """
@@ -75,6 +64,7 @@ class Neo4jDriver():
         """
         session = self.driver.session()
 
+        # defines the schema to drop from the csv file
         query:str = """
                     LOAD CSV WITH HEADERS FROM 'file:///spotify.csv' AS row
                         CREATE (:Track {
@@ -100,7 +90,7 @@ class Neo4jDriver():
                         genre: row.track_genre
                     })
                     """
-
+        # executes the query
         session.run(query)
 
     def flush_database(self) -> None:
@@ -112,85 +102,24 @@ class Neo4jDriver():
             print(f"Deleted all nodes and edges")
 
 
-    def create_node(self, label, **properties):
-        """
-        Creates a new node using the _create_node() staticmethod.
-        """
-        with self.driver.session() as session:
-            result = session.write_transaction(self._create_node, label, properties)
-            return result
-
-    @staticmethod
-    def _create_node(tx, label:str, properties:dict):
-        """
-        Method to create nodes given a dictionary of properties.
-        """
-        query = f"CREATE (n:{label} {{"
-        for key, value in properties.items():
-            query += f"{key}: '{value}',"
-        query: str = query[:-1] + "})"
-        result = tx.run(query)
-        return result
-
     def create_relationship(self, start_node_id:str, end_node_id:str, relationship_type:str, props:str) -> None:
         """
         Creates a new relationship between two nodes given their IDs and a relationship type.
         """
         with self.driver.session() as session:
+            # beings transaction
             tx = session.begin_transaction()
+            # query string
             query: str = f"MATCH (a),(b) WHERE ID(a)={start_node_id} AND ID(b)={end_node_id} CREATE (a)-[r:{relationship_type} {props}]->(b)"
+            # executes and commits
             tx.run(query)
             tx.commit()
-
-    def delete_node(self, node_id:str) -> None:
-        """
-        Deletes a node from the database given its ID.
-        """
-        with self.driver.session() as session:
-            tx = session.begin_transaction()
-            query: str = f"MATCH (n) WHERE ID(n)={node_id} DELETE n"
-            tx.run(query)
-            tx.commit()
-
-    def delete_relationship(self, relationship_id) -> None:
-        """
-        Deletes a relationship from the database given the relationship ID.
-        """
-        with self.driver.session() as session:
-            tx = session.begin_transaction()
-            query: str = f"MATCH ()-[r]-() WHERE ID(r)={relationship_id} DELETE r"
-            tx.run(query)
-            tx.commit()
-
-    def find_node_by_property(self, label, property_name, property_value) -> list:
-        """
-        Queries for a given node from a defined property name and value.
-        """
-        with self.driver.session() as session:
-            tx = session.begin_transaction()
-            query: str = f"MATCH (n:{label}) WHERE n.{property_name}='{property_value}' RETURN n"
-            result = tx.run(query)
-            records:list = [record["n"] for record in result]
-            tx.commit()
-            return records
-
-    def get_node_by_id(self, node_id):
-        """
-        Queries for a given node by its ID.
-        """
-        with self.driver.session() as session:
-            tx = session.begin_transaction()
-            query: str = f"MATCH (n) WHERE ID(n)={node_id} RETURN n"
-            result = tx.run(query)
-            record = result.single()["n"]
-            tx.commit()
-            return record
 
     def eucliean_distance(self, track1: dict, track2: dict) -> float:
         """
         Calculates the similarity score between two tracks based on their attribute values.
         """
-        
+
         def process_dict(d) -> np.ndarray:
             # MATCH (p:Track) RETURN MAX(p.ATTRIBUTE YOU WANT) AS max_price, MIN(p.ATTRIBUTE YOU WANT) AS min_price
             # Create a list of numerical values, mapping True/False to 1/0
@@ -212,7 +141,7 @@ class Neo4jDriver():
         # Calculate Euclidean distance between the tracks
         return np.linalg.norm((t1-t2))
 
-    def evaluate_metrics(self, threshold=100) -> None:
+    def evaluate_metrics(self, threshold=0) -> None:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
@@ -243,16 +172,36 @@ class Neo4jDriver():
                     record = result.single()
                     self.max_min_values[key] = (record[f"max_{key}"], record[f"min_{key}"])
             # normalize all features for all nodes
-            all_tracks = session.run("MATCH (t:Track) RETURN t")
-            for track in all_tracks:
-                for key in self.track_keys:
-                    if key not in self.exclude_keys:
-                        # Update the track feature in the database
-                        track_feature = track['t']._properties[key]
-                        normalized_feature = (track_feature - self.max_min_values[key][1]) / (
-                                    self.max_min_values[key][0] - self.max_min_values[key][1])
-                        query = f"MATCH (t:Track) WHERE ID(t) = {track['t']._id} SET t.{key} = {normalized_feature}"
-                        session.run(query)
+                for ele in tqdm(self.random_nodes):
+                    track = session.run(f"MATCH (t:Track) WHERE ID(t) ={ele} RETURN t").single()
+                    for key in self.track_keys:
+                        if key not in self.exclude_keys:
+                            # Update the track feature in the database
+                            track_feature = track['t']._properties[key]
+                            try:
+                                normalized_feature = (track_feature - self.max_min_values[key][1]) / (
+                                            self.max_min_values[key][0] - self.max_min_values[key][1])
+                                query = f"MATCH (t:Track) WHERE ID(t) = {ele} SET t.{key} = {normalized_feature}"
+                                session.run(query)
+                                session.commit()
+                            except:
+                                pass
+
+                for ele in tqdm(self.artists_nodes):
+                    track = session.run(f"MATCH (t:Track) WHERE ID(t) ={ele} RETURN t").single()
+                    for key in self.track_keys:
+                        if key not in self.exclude_keys:
+                            # Update the track feature in the database
+                            track_feature = track['t']._properties[key]
+                            try:
+                                normalized_feature = (track_feature - self.max_min_values[key][1]) / (
+                                            self.max_min_values[key][0] - self.max_min_values[key][1])
+                                query = f"MATCH (t:Track) WHERE ID(t) = {ele} SET t.{key} = {normalized_feature}"
+                                session.run(query)
+                                session.commit()
+                            except:
+                                pass
+                        
     def random_sample(self, batch_size=1500, artist="Regina Spektor") -> None:
         with self.driver.session() as session:
             query:str = f"MATCH (t:Track) WHERE NOT t.artist = '{artist}' WITH t, rand() AS r ORDER BY r RETURN ID(t) AS track_id LIMIT {batch_size}"
@@ -273,7 +222,7 @@ class Neo4jDriver():
         recommended_songs: list = []
 
         # Create the relationships across the entire graph 
-        self.evaluate_metrics()
+        # self.evaluate_metrics()
     
         # Get the top recommended songs
         with self.driver.session() as session:
@@ -301,7 +250,7 @@ if __name__ == "__main__":
 
     # # set randomly sampled tracks
     if len(driving.random_nodes) == 0:
-        driving.random_sample(batch_size=2000)
+        driving.random_sample(batch_size=1000)
         print("Sampling complete")
         print(len(driving.random_nodes))
         print(len(driving.artists_nodes))
@@ -309,10 +258,7 @@ if __name__ == "__main__":
     # normalize the data
     driving.normalize_data()
     driving.evaluate_metrics()
-    print("metrics evaluated")
-  
     songs: list = driving.find_recommended_songs()
     print(songs)
 
-
-    # driving.disconnect()
+    driving.disconnect()
