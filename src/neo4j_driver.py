@@ -289,11 +289,11 @@ if __name__ == "__main__":
     print("driver working")
 
     # drop existing database data
-    # driving.flush_database()
+    driving.flush_database()
     print("Data flushed")
 
     # fill the db with spotify csv data
-    # driving.set_spotify_schema()
+    driving.set_spotify_schema()
     print("Data added")
 
     # set randomly sampled tracks
