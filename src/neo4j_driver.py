@@ -306,6 +306,8 @@ if __name__ == "__main__":
         print(len(driving.random_nodes))
         print(len(driving.artists_nodes))
 
+    # normalize the data
+    driving.normalize_data()
     driving.evaluate_metrics()
     print("metrics evaluated")
   
