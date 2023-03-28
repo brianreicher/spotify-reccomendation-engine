@@ -167,13 +167,6 @@ class Neo4jDriver():
                         self.create_relationship(node_artist, pair_node, "MATCHED", f"{{sim_score: {similarity_score}}}")
 
     def normalize_data(self) -> np.ndarray:
-<<<<<<< HEAD
-        """
-        Utilized full-dataset min/max to normalize the data in the sample set.
-        """
-=======
-        
->>>>>>> a3e1efce8b97e2237507c95eab3727da6b91d9cc
         # Get the top recommended songs
         with self.driver.session() as session:
             for key in self.track_keys:
@@ -183,26 +176,39 @@ class Neo4jDriver():
                     result = session.run(query)
                     record = result.single()
                     self.max_min_values[key] = (record[f"max_{key}"], record[f"min_{key}"])
-
-            def normalize_nodes(nodes: list) -> None:
-                # normalize all features for all nodes
-                for ele in tqdm(nodes):
-                    track = session.run(f"MATCH (t:Track) WHERE ID(t) ={ele} RETURN t").single()
-                    for key in self.track_keys:
-                        if key not in self.exclude_keys:
-                            # Update the track feature in the database
-                            track_feature = track['t']._properties[key]
-                            try:
-                                normalized_feature = (track_feature - self.max_min_values[key][1]) / (
+            
+            # normalize all features for all random nodes
+            print("break1")
+            for ele in tqdm(self.random_nodes):
+                track = session.run(f"MATCH (t:Track) WHERE ID(t) ={ele} RETURN t").single()
+                for key in self.track_keys:
+                    if key not in self.exclude_keys:
+                        # Update the track feature in the database
+                        track_feature = track['t']._properties[key]
+                        try:
+                            normalized_feature = (track_feature - self.max_min_values[key][1]) / (
                                         self.max_min_values[key][0] - self.max_min_values[key][1])
-                                query = f"MATCH (t:Track) WHERE ID(t) = {ele} SET t.{key} = {normalized_feature}"
-                                session.run(query)
-                                session.commit()
-                            except:
-                                pass
-                
-            normalize_nodes(self.random_nodes)
-            normalize_nodes(self.artists_nodes)
+                            query = f"MATCH (t:Track) WHERE ID(t) = {ele} SET t.{key} = {normalized_feature}"
+                            session.run(query)
+                            session.commit()
+                        except:
+                            pass
+            print("break2")
+            for ele in tqdm(self.artists_nodes):
+                track = session.run(f"MATCH (t:Track) WHERE ID(t) ={ele} RETURN t").single()
+                for key in self.track_keys:
+                    if key not in self.exclude_keys:
+                        # Update the track feature in the database
+                        track_feature = track['t']._properties[key]
+                        try:
+                            normalized_feature = (track_feature - self.max_min_values[key][1]) / (
+                                        self.max_min_values[key][0] - self.max_min_values[key][1])
+                            query = f"MATCH (t:Track) WHERE ID(t) = {ele} SET t.{key} = {normalized_feature}"
+                            session.run(query)
+                            session.commit()
+                        except:
+                            pass
+            print("break4")
                         
     def random_sample(self, batch_size=1500, artist="Regina Spektor") -> None:
         """
@@ -226,7 +232,6 @@ class Neo4jDriver():
         """
         Given an artist, finds recommended songs using to a certain number
         """
-        # 
         # initialized a list of random songs
         recommended_songs: list = []
 
@@ -249,16 +254,16 @@ if __name__ == "__main__":
     print("driver working")
 
     # drop existing database data
-    driving.flush_database()
+    # driving.flush_database()
     print("Data flushed")
 
     # fill the db with spotify csv data
-    driving.set_spotify_schema()
+    # driving.set_spotify_schema()
     print("Data added")
 
     # set randomly sampled tracks
     if len(driving.random_nodes) == 0:
-        driving.random_sample(batch_size=1000)
+        driving.random_sample(batch_size=500)
         print("Sampling complete")
 
 
