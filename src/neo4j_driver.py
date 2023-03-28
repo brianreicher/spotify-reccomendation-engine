@@ -186,7 +186,7 @@ class Neo4jDriver():
         def process_dict(d) -> np.ndarray:
             # Define a list of keys to exclude from the array
             exclude_keys: list[str] = ['artist', 'album', 'name', 'genre', 'id']
-
+            # MATCH (p:Track) RETURN MAX(p.ATTRIBUTE YOU WANT) AS max_price, MIN(p.ATTRIBUTE YOU WANT) AS min_price
             # Create a list of numerical values, mapping True/False to 1/0
             values:list = []
             for key, value in d.items():
@@ -204,9 +204,9 @@ class Neo4jDriver():
         t2: np.ndarray = process_dict(track2)
 
         # Calculate Euclidean distance between the tracks
-        return 1/ (np.linalg.norm((t1-t2))+1)
+        return np.linalg.norm((t1-t2))
 
-    def evaluate_metrics(self, threshold=.01e-6) -> None:
+    def evaluate_metrics(self, threshold=100) -> None:
         """
         Method for evaluating a given metric threshold over a random batch of nodes.
         """
@@ -239,23 +239,23 @@ class Neo4jDriver():
             for rec in res_art:
                 self.artists_nodes.append(rec['track_id'])
 
-    def find_recommended_songs(self, track_id: str, num_recommendations=5, artist="Regina Spektor") -> np.ndarray:
+    def find_recommended_songs(self, num_recommendations=10, artist="Regina Spektor") -> np.ndarray:
         """
         Given a track ID, finds recommended songs using the specified similarity metric and threshold.
         """
-        recommended_songs:np.ndarray = np.zeros()
+        recommended_songs:list = []
 
         # Create the relationships across the entire graph 
         self.evaluate_metrics()
     
         # Get the top recommended songs
         with self.driver.session() as session:
-            query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.id = '{track_id}' RETURN t2.id, t2.name ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
+            query: str = f"MATCH (t1:Track)-[r]->(t2:Track) WHERE t1.artist = '{artist}' RETURN t2.id, t2.name, t2.artist ORDER BY r.sim_score DESC LIMIT {num_recommendations}"
             result = session.run(query)
             for record in result:
-                recommended_songs.append(record['t2.id'])
+                recommended_songs.append(f"{record['t2.name']}, {record['t2.artist']}")
         
-        return recommended_songs
+        return set(recommended_songs)
 
 
 if __name__ == "__main__":
@@ -264,29 +264,26 @@ if __name__ == "__main__":
     driving.connect()
     print("driver working")
 
-    # # drop existing database data
+    # drop existing database data
     # driving.flush_database()
-    # # fill the db with spotify csv data
+    print("Data flushed")
+
+    # fill the db with spotify csv data
     # driving.set_spotify_schema()
-    print("Data dropped")
+    print("Data added")
 
     # # set randomly sampled tracks
-    driving.random_sample()
-    # print("Sampling complete")
-    print(len(driving.random_nodes))
-    print(len(driving.artists_nodes))
+    if len(driving.random_nodes) == 0:
+        driving.random_sample(batch_size=2000)
+        print("Sampling complete")
+        print(len(driving.random_nodes))
+        print(len(driving.artists_nodes))
+
     driving.evaluate_metrics()
     print("metrics evaluated")
   
-    # driving.find_recommended_songs()
-     # Find Regina Spektor node
-    # regina_nodes = driving.find_node_by_property('Track', 'name', 'Regina Spector')
-    # regina_node = regina_nodes[0]
-    # regina_id = regina_node['id']
+    songs: list = driving.find_recommended_songs()
+    print(songs)
 
-    #  # Find 5 recommended songs for Regina Spektor
-    # recommended_songs = driving.find_recommended_songs(regina_id, limit=5)
-    # for song in recommended_songs:
-    #     print(song)
 
     # driving.disconnect()
