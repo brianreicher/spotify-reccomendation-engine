@@ -256,7 +256,7 @@ class Neo4jDriver():
             for rec in res_art:
                 self.artists_nodes.append(rec['track_id'])
 
-    def find_recommended_songs(self, num_recommendations=10, artist="Regina Spektor") -> set:
+    def find_recommended_songs(self, num_recommendations=5, artist="Regina Spektor") -> set:
         """
         Given an artist, finds recommended songs using to a certain number
 
@@ -298,7 +298,7 @@ if __name__ == "__main__":
 
     # set randomly sampled tracks
     if len(driving.random_nodes) == 0:
-        driving.random_sample(batch_size=500)
+        driving.random_sample(batch_size=1500)
         print("Sampling complete")
 
 
